@@ -1,7 +1,6 @@
 #include "dpitunnel-cli.h"
 
 #include "profiles.h"
-#include "netiface.h"
 
 #include <iostream>
 
@@ -13,23 +12,11 @@ void add_profile(std::string name, Profile_s profile) {
 	Profiles[name] = profile;
 }
 
-int change_profile(std::string * choosen_profile_name /*= NULL*/) {
+int change_profile(const std::string & iface, const std::string & wifi_ap, std::string * choosen_profile_name /*= NULL*/) {
 	if(Profiles.empty())
 		return 0;
 
-	std::string iface = get_current_iface_name();
-	if(iface.empty()) {
-		std::cerr << "Failed to find default route" << std::endl;
-		return -1;
-	}
-	std::string wifi_point = get_current_wifi_name(iface);
-
-	std::cout << "Netiface: " << iface;
-	if(!wifi_point.empty())
-		std::cout << ", Wi-Fi point name: " << wifi_point;
-	std::cout << std::endl;
-
-	auto search = Profiles.find(iface + (wifi_point.empty() ? "" : (':' + wifi_point)));
+	auto search = Profiles.find(iface + (wifi_ap.empty() ? "" : (':' + wifi_ap)));
 	if(search != Profiles.end())
 		Profile = search->second;
 	else {
