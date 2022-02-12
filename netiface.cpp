@@ -17,6 +17,10 @@
 #include <linux/wireless.h>
 #include <poll.h>
 #include <sys/ioctl.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <sys/types.h>
+#include <ifaddrs.h>
 
 #include <unistd.h>
 
@@ -87,11 +91,11 @@ void route_monitor_thread() {
 	fds[0].events = POLLIN;
 
 	// fds[1] is interrupt pipe
-        fds[1].fd = Interrupt_pipe[0];
-        fds[1].events = POLLIN;
+	fds[1].fd = Interrupt_pipe[0];
+	fds[1].events = POLLIN;
 
 	// Set poll() timeout
-        int timeout = -1;
+	int timeout = -1;
 
 	int len;
 	while(!stop_flag.load()) {
@@ -110,29 +114,39 @@ void route_monitor_thread() {
                                 break;
 
 			// Process netlink socket
-                        if (fds[0].revents & POLLIN) {
+			if (fds[0].revents & POLLIN) {
 				len = recv(sock, nlh, buffer.size(), 0);
 				if(len <= 0) {
 					std::cerr << "Netlink socket receive error. Errno: " << std::strerror(errno) << std::endl;
 					break;
 				}
-
 				while ((NLMSG_OK(nlh, len)) && (nlh->nlmsg_type != NLMSG_DONE)) {
-					if(nlh->nlmsg_type == RTM_NEWROUTE || nlh->nlmsg_type == RTM_DELROUTE) {
+					if(nlh->nlmsg_type == RTM_NEWROUTE) {
 						// Check is it default route
 						struct rtattr* tb[RTA_MAX + 1];
 						struct rtmsg* r = (struct rtmsg *) NLMSG_DATA(nlh);
 						parse_rtattr(tb, RTA_MAX, RTM_RTA(r), nlh->nlmsg_len - NLMSG_LENGTH(sizeof(*r)));
-						if(!tb[RTA_DST] && !r->rtm_dst_len) {
+						if(!tb[RTA_DST] && !r->rtm_dst_len && tb[RTA_OIF]) {
 							std::cout << "Detected network changes. Changing profile..." << std::endl;
+
+							char iface_c_str[IF_NAMESIZE];
+							if_indextoname(*(int *) RTA_DATA(tb[RTA_OIF]), iface_c_str);
+							std::string iface = std::string(iface_c_str);
+
+							std::string wifi_ap = get_current_wifi_name(iface);
+
+							std::cout << "Netiface: " << iface;
+							if(!wifi_ap.empty())
+								std::cout << ", Wi-Fi point name: " << wifi_ap;
+							std::cout << std::endl;
+
 							std::string temp;
-							if(change_profile(&temp) == 0)
+							if(change_profile(iface, wifi_ap, &temp) == 0)
 								std::cout << "Current profile: " << temp << std::endl;
 							else
 								std::cerr << "Failed to change profile" << std::endl;
 						}
 					}
-
 					nlh = NLMSG_NEXT(nlh, len);
 				}
 			}
@@ -146,90 +160,63 @@ void route_monitor_thread() {
 }
 
 std::string get_current_iface_name() {
-	int sock;
-	if((sock = socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE)) < 0) {
-		std::cerr << "Failed to open netlink socket. Errno: " << std::strerror(errno) << std::endl;
-		return "";
-	}
+    // "Connect" to IP from global Internet and getsockname()
+    const std::string global_ip = "198.41.0.4"; // 'A' root server IP
 
-	std::string buffer(8192, '\x00');
-	struct nlmsghdr* nlmsg = (struct nlmsghdr *) &buffer[0];
+    std::string res = "";
 
-	// Fill header
-	int msgseq = rand();
-	nlmsg->nlmsg_len = NLMSG_LENGTH(sizeof(struct rtmsg));
-	nlmsg->nlmsg_type = RTM_GETROUTE;
-	nlmsg->nlmsg_flags = NLM_F_DUMP | NLM_F_REQUEST;
-	nlmsg->nlmsg_seq = msgseq;
-	nlmsg->nlmsg_pid = getpid();
+    int sock;
+    if((sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+        std::cerr << "Failed to open test socket. Errno: " << std::strerror(errno) << std::endl;
+        return "";
+    }
+    // Add port and address
+    struct sockaddr_in server_address;
+    server_address.sin_family = AF_INET;
+    server_address.sin_port = htons(80);
+    inet_pton(AF_INET, global_ip.c_str(), &server_address.sin_addr);
 
-	struct sockaddr_nl snl;
-	memset(&snl, 0, sizeof(snl));
-	snl.nl_family = AF_NETLINK;
+    if(connect(sock, (struct sockaddr *) &server_address, sizeof(server_address)) < 0) {
+        std::cerr << "Test socket can't \"connect\". Errno: " << std::strerror(errno) << std::endl;
+        close(sock);
+        return "";
+    }
 
-	struct iovec iov;
-	iov.iov_base = nlmsg;
-	iov.iov_len = nlmsg->nlmsg_len;
+    struct sockaddr_in addr;
+    struct ifaddrs* ifaddr;
+    struct ifaddrs* ifa;
+    socklen_t addr_len;
 
-	struct msghdr msg;
-	memset(&msg, 0, sizeof(msg));
-	msg.msg_name = &snl;
-	msg.msg_namelen = sizeof(snl);
-	msg.msg_iov = &iov;
-	msg.msg_iovlen = 1;
+    addr_len = sizeof (addr);
+    getsockname(sock, (struct sockaddr*)&addr, &addr_len);
+    getifaddrs(&ifaddr);
 
-	// Send request
-	if(sendmsg(sock, &msg, 0) < 0) {
-		std::cerr << "Failed to send netlink message. Errno: " << std::strerror(errno) << std::endl;
-		close(sock);
-		return "";
-	}
+    // look which interface contains the wanted IP.
+    // When found, ifa->ifa_name contains the name of the interface (eth0, eth1, ppp0...)
+    for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next)
+    {
+        if (ifa->ifa_addr)
+        {
+            if (AF_INET == ifa->ifa_addr->sa_family)
+            {
+                struct sockaddr_in* inaddr = (struct sockaddr_in*)ifa->ifa_addr;
 
-	iov.iov_base = &buffer[0];
-	iov.iov_len = buffer.size();
-
-	// Receive response
-	int result;
-	if((result = recvmsg(sock, &msg, 0)) <= 0) {
-		std::cerr << "Failed to receive from netlink socket. Errno: " << std::strerror(errno) << std::endl;
-		close(sock);
-		return "";
-	}
+                if (inaddr->sin_addr.s_addr == addr.sin_addr.s_addr)
+                {
+                    if (ifa->ifa_name)
+                    {
+                        res = ifa->ifa_name;
+                    }
+                }
+            }
+        }
+    }
+    freeifaddrs(ifaddr);
 	close(sock);
 
-	while(NLMSG_OK(nlmsg, result) && nlmsg->nlmsg_type != NLMSG_DONE) {
-		if(nlmsg->nlmsg_len < (int) sizeof(struct nlmsghdr) || nlmsg->nlmsg_len > result ||
-			nlmsg->nlmsg_seq != msgseq) {
-			nlmsg = NLMSG_NEXT(nlmsg, result);
-			continue;
-		}
-
-		if(nlmsg->nlmsg_type == NLMSG_ERROR) {
-			std::cerr << "nlmsg_type == NLMSG_ERROR" << std::endl;
-			return "";
-		}
-
-		std::string interface(IF_NAMESIZE, '\x00');
-		struct rtmsg *route_entry;
-		struct rtattr *route_attribute;
-		route_entry = (struct rtmsg *) NLMSG_DATA(nlmsg);
-		route_attribute = (struct rtattr *) RTM_RTA(route_entry);
-		int route_attribute_len = RTM_PAYLOAD(nlmsg);
-
-		while(RTA_OK(route_attribute, route_attribute_len)) {
-			if(route_attribute->rta_type == RTA_OIF) {
-				if_indextoname(*(int *) RTA_DATA(route_attribute), &interface[0]);
-				return std::string(interface.c_str());
-			}
-
-			route_attribute = RTA_NEXT(route_attribute, route_attribute_len);
-		}
-
-		nlmsg = NLMSG_NEXT(nlmsg, result);
-	}
-
-	std::cerr << "Failed to find default network interface" << std::endl;
-	return "";
+    if(res.empty())
+        std::cerr << "Failed to find default network interface" << std::endl;
+    return res;
 }
 
 std::string get_current_wifi_name_ioctl(std::string iface_name) {
