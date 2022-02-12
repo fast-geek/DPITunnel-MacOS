@@ -15,6 +15,7 @@
 #include <cstring>
 #include <fcntl.h>
 #include <iostream>
+#include <fstream>
 #include <future>
 #include <mutex>
 #include <thread>
@@ -36,7 +37,7 @@ const std::string HELP_PAGE(
 			"\n"
 			"Usage:\n"
 			"  dpitunnel-cli [options]\n"
-			"  dpitunnel-cli [--ip <bind_ip>][--port <bind_port>][--ca-bundle-path <path>][--daemon] <--profile [<net_interface_name>[:<wifi_name>]]|[default] [options]>...\n"
+			"  dpitunnel-cli [--pid <file>][--ip <bind_ip>][--port <bind_port>][--ca-bundle-path <path>][--daemon] <--profile [<net_interface_name>[:<wifi_name>]]|[default] [options]>...\n"
 			"  dpitunnel-cli --auto\n"
 			"\n"
 			"Options:\n"
@@ -44,6 +45,7 @@ const std::string HELP_PAGE(
 			"  --profile=[<net_interface_name>\n"
 			"  \t[:<wifi_name>]]|[default]\t\tsettings for a specific connection\n"
 			"  --help\t\t\t\t\tshow this message\n"
+			"  --pid=<file>\t\t\t\t\twrite pid to file in daemon mode\n"
 			"  --ip=<ip>\t\t\t\t\tIP to bind the http proxy. Default: 0.0.0.0\n"
 			"  --port=<port>\t\t\t\t\tport to bind http proxy. Default: 8080\n"
 			"  --ca-bundle-path=<path>\t\t\tpath to CA certificates bundle in PEM format. Default: ./ca.bundle\n"
@@ -406,6 +408,7 @@ int parse_cmdline(int argc, char* argv[]) {
 		{"builtin-dns", no_argument, 0, 0}, // id 16
 		{"builtin-dns-ip", required_argument, 0, 0}, // id 17
 		{"builtin-dns-port", required_argument, 0, 0}, // id 18
+		{"pid", required_argument, 0, 0}, // id 19
 		{NULL, 0, NULL, 0}
 	};
 
@@ -571,6 +574,8 @@ int parse_cmdline(int argc, char* argv[]) {
 
 				break;
 
+			case 19: // pid
+				Settings_perst.pid_file = optarg;
 		}
 	}
 
@@ -668,8 +673,16 @@ int main(int argc, char* argv[]) {
 	// Show info
 	print_info();
 
-	if(Settings_perst.daemon)
+	if(Settings_perst.daemon) {
 		daemonize();
+		if(!Settings_perst.pid_file.empty()){
+			std::ofstream file(Settings_perst.pid_file);
+			if(file) {
+				file << getpid();
+				file.close();
+			}
+		}
+	}
 
 	// Start route monitor thread to correctly change profiles
 	std::thread t1;

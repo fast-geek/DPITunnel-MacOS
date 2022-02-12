@@ -65,6 +65,7 @@ struct Settings_perst_s {
 	std::string ca_bundle_path = "./ca.bundle";
 	std::string ca_bundle;
 
+	std::string pid_file;
 	bool daemon = false;
 };
 
