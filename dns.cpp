@@ -104,10 +104,11 @@ int resolve_host_over_udp(const std::string & host, std::string & ip) {
 	// Fill server address
 	struct sockaddr_in server_address;
 	server_address.sin_family = AF_INET;
-	server_address.sin_port = htons(Settings_perst.builtin_dns_port);
+	server_address.sin_port = htons(Profile.builtin_dns_port);
 
-	if(inet_pton(AF_INET, Settings_perst.builtin_dns_ip.c_str(), &server_address.sin_addr) <= 0) {
+	if(inet_pton(AF_INET, Profile.builtin_dns_ip.c_str(), &server_address.sin_addr) <= 0) {
 		std::cerr << "Invalid DNS server ip address" << std::endl;
+		close(sock);
 		return -1;
 	}
 
@@ -223,7 +224,7 @@ int resolve_host_over_doh(const std::string & host, std::string & ip) {
 
 	// Make request
 	httplib::SSLClient cli(serv_host);
-	if(Settings_perst.builtin_dns) {
+	if(Profile.builtin_dns) {
 		std::string serv_ip;
 	
 		// Check if host is IP
@@ -303,7 +304,7 @@ int resolve_host(const std::string & host, std::string & ip) {
 
 	if(Profile.doh)
 		return resolve_host_over_doh(host, ip);
-	else if(Settings_perst.builtin_dns)
+	else if(Profile.builtin_dns)
 		return resolve_host_over_udp(host, ip);
 	else
 		return resolve_host_over_system(host, ip);

@@ -553,18 +553,18 @@ int parse_cmdline(int argc, char* argv[]) {
 				break;
 
 			case 16: // builtin-dns
-				Settings_perst.builtin_dns = true;
+				profile.builtin_dns = true;
 
 				break;
 
 			case 17: // builtin-dns-ip
-				Settings_perst.builtin_dns_ip = optarg;
+				profile.builtin_dns_ip = optarg;
 
 				break;
 
 			case 18: // builtin-dns-port
-				Settings_perst.builtin_dns_port = atoi(optarg);
-				if(Settings_perst.builtin_dns_port < 1 || Settings_perst.builtin_dns_port > 65535) {
+				profile.builtin_dns_port = atoi(optarg);
+				if(profile.builtin_dns_port < 1 || profile.builtin_dns_port > 65535) {
 					std::cerr << "-builtin-dns-port invalid argument" << std::endl;
 					return -1;
 				}

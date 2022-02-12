@@ -41,6 +41,10 @@ struct Profile_s {
 
 	std::string doh_server = "https://dns.google/dns-query";
 
+	bool builtin_dns = false;
+	std::string builtin_dns_ip = "8.8.8.8";
+	int builtin_dns_port = 53;
+
 	bool split_at_sni = false;
 	bool desync_attacks = false;
 	bool doh = false;
@@ -54,13 +58,13 @@ struct Settings_perst_s {
 	unsigned short packet_capture_timeout = 5000;
 	unsigned int builtin_dns_req_timeout = 10000;
 	unsigned int count_hops_connect_timeout = 1000;
+
 	int server_port = 8080;
-	int builtin_dns_port = 53;
-	std::string builtin_dns_ip = "8.8.8.8";
 	std::string server_address = "0.0.0.0";
+
 	std::string ca_bundle_path = "./ca.bundle";
 	std::string ca_bundle;
-	bool builtin_dns = false;
+
 	bool daemon = false;
 };
 
