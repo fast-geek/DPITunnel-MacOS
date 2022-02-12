@@ -43,7 +43,7 @@ int connect_with_timeout(int sockfd, const struct sockaddr *addr, socklen_t addr
 				struct timespec now;
 				if(clock_gettime(CLOCK_MONOTONIC, &now)<0) { rc=-1; break; }
 				struct timespec deadline = { .tv_sec = now.tv_sec,
-								.tv_nsec = now.tv_nsec + timeout_ms*1000000l};
+								.tv_nsec = now.tv_nsec + ((long) timeout_ms)*1000000l};
 				// Wait for the connection to complete.
         	        	do {
 					// Calculate how long until the deadline

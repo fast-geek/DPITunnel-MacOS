@@ -20,6 +20,7 @@ int load_ca_bundle() {
 	std::stringstream stream;
 	stream << file.rdbuf();
 	Settings_perst.ca_bundle = stream.str();
+	file.close();
 
 	return 0;
 }
