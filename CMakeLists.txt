@@ -6,8 +6,6 @@ cmake_policy(SET CMP0065 NEW)
 
 if(STATIC_BINARY)
 	message("Building static portable binary with small size")
-	set(CMAKE_C_FLAGS " -ffunction-sections -Wl,-gc-sections -s")
-	set(CMAKE_CXX_FLAGS " -ffunction-sections -Wl,-gc-sections -s")
 endif()
 
 
@@ -36,6 +34,9 @@ add_executable(DPITunnel-cli-exec
 
 if(STATIC_BINARY)
 	target_link_libraries(DPITunnel-cli-exec -static)
+	target_link_options(DPITunnel-cli-exec PRIVATE "LINKER:--gc-sections")
+	target_link_options(DPITunnel-cli-exec PRIVATE "LINKER:-s")
+	target_compile_options(DPITunnel-cli-exec PRIVATE -ffunction-sections)
 endif()
 
 # Set the directories that should be included in the build command for this target
@@ -63,4 +64,9 @@ target_link_libraries(DPITunnel-cli-exec
 		libnl
 		Threads::Threads
 		OpenSSL::SSL
+		OpenSSL::Crypto
 )
+
+if(STATIC_BINARY)
+	target_link_libraries(DPITunnel-cli-exec ${CMAKE_DL_LIBS})
+endif()
