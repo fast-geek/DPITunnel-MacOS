@@ -39,6 +39,12 @@ struct Profile_s {
 	unsigned short window_size = 0;
 	short window_scale_factor = -1;
 
+	unsigned short min_ttl = 0;
+	bool auto_ttl = false;
+	unsigned short auto_ttl_a1 = 1;
+	unsigned short auto_ttl_a2 = 4;
+	unsigned short auto_ttl_max = 10;
+
 	std::string doh_server = "https://dns.google/dns-query";
 
 	bool builtin_dns = false;

@@ -55,10 +55,15 @@ const std::string HELP_PAGE(
 			"  --split-at-sni\t\t\t\tsplit Client Hello at SNI\n"
 			"  --split-position=<offset_in_bytes>\t\tsplit Client Hello at <offset_in_bytes>. Default: 3\n"
 			"  --ttl=<number>\t\t\t\tTTL for fake packets\n"
+			"  --auto-ttl=<a1>-<a2>-<m>\t\t\tautomatically detect TTL and decrease\n"
+            "  \t\t\t\t\t\tit based on a distance. If the distance is shorter than a2, TTL is decreased\n"
+            "  \t\t\t\t\t\tby a2. If it's longer, (a1; a2) scale is used with the distance as a weight.\n"
+            "  \t\t\t\t\t\tIf the resulting TTL is more than m(ax), set it to m. Default: 1-4-10. And --min-ttl 3\n"
+            "  --min-ttl=<number>\t\t\t\tminimum TTL for which send fake packets\n"
 			"  --doh\t\t\t\t\t\tresolve hosts over DoH server\n"
 			"  --doh-server=<url>\t\t\t\tDoH server URL. Default: https://dns.google/dns-query\n"
 			"  --builtin-dns\t\t\t\t\tindependently resolve hostnames, don't use getaddrinfo. You must enable it on Android\n"
-			"  \tand other systems that don't have /etc/resolv.conf\n"
+			"  \t\t\t\t\t\tand other systems that don't have /etc/resolv.conf\n"
 			"  --builtin-dns-ip=<ip>\t\t\t\tDNS server IP used by builtin resolver. Default: 8.8.8.8\n"
 			"  --builtin-dns-port=<port>\t\t\tDNS server port used by builtin resolver. Default: 53\n"
 			"  --wsize=<number>\t\t\t\tTCP window size. Used to ask server to split Server Hello\n"
@@ -395,6 +400,8 @@ int parse_cmdline(int argc, char* argv[]) {
 		{"builtin-dns-ip", required_argument, 0, 0}, // id 17
 		{"builtin-dns-port", required_argument, 0, 0}, // id 18
 		{"pid", required_argument, 0, 0}, // id 19
+		{"min-ttl", required_argument, 0, 0}, // id 20
+		{"auto-ttl", required_argument, 0, 0}, // id 21
 		{NULL, 0, NULL, 0}
 	};
 
@@ -562,6 +569,45 @@ int parse_cmdline(int argc, char* argv[]) {
 
 			case 19: // pid
 				Settings_perst.pid_file = optarg;
+
+				break;
+
+			case 20: // min-ttl
+				profile.min_ttl = atoi(optarg);
+				if(profile.min_ttl < 1 || profile.min_ttl > 255) {
+					std::cerr << "-min-ttl invalid argument" << std::endl;
+					return -1;
+				}
+
+				break;
+
+			case 21: // auto-ttl
+				{
+					profile.auto_ttl = true;
+					char *autottl_copy = strdup(optarg);
+					char *pch = strtok(autottl_copy, "-");
+					int i;
+					for (i = 0; pch != NULL; i++) {
+						if (i == 0)
+							profile.auto_ttl_a1 = atoi(pch);
+						else if (i == 1)
+							profile.auto_ttl_a2 = atoi(pch);
+						else if (i == 2)
+							profile.auto_ttl_max = atoi(pch);
+						pch = strtok(NULL, "-");
+					}
+					free(autottl_copy);
+					if(i != 3) {
+						std::cerr << "-auto-ttl invalid argument" << std::endl;
+						return -1;
+					}
+
+					// Set default min ttl
+					if (profile.min_ttl == 0)
+						profile.min_ttl = 3;
+				}
+
+				break;
 		}
 	}
 

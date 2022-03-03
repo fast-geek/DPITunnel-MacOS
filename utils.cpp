@@ -9,6 +9,7 @@
 #include <cstring>
 #include <iostream>
 #include <vector>
+#include <math.h>
 #include <unistd.h>
 
 bool is_space_or_tab(char c) { return c == ' ' || c == '\t'; }
@@ -178,4 +179,39 @@ int ignore_sigpipe() {
 	}
 
 	return 0;
+}
+
+/*
+ * Credits for tcp_get_auto_ttl realization to ValdikSS (https://github.com/ValdikSS/GoodbyeDPI/blob/5494be72ba374b688d87d6ecb5024d71cd1803ff/src/ttltrack.c#L222)
+ * */
+int tcp_get_auto_ttl(const uint8_t ttl, const uint8_t autottl1,
+					 const uint8_t autottl2, const uint8_t minhops,
+					 const uint8_t maxttl) {
+	uint8_t nhops = 0;
+	uint8_t ttl_of_fake_packet = 0;
+
+	if (ttl > 98 && ttl < 128) {
+		nhops = 128 - ttl;
+	}
+	else if (ttl > 34 && ttl < 64) {
+		nhops = 64 - ttl;
+	}
+	else {
+		return 0;
+	}
+
+	if (nhops <= autottl1 || nhops < minhops) {
+		return 0;
+	}
+
+	ttl_of_fake_packet = nhops - autottl2;
+	if (ttl_of_fake_packet < autottl2 && nhops <= 9) {
+		ttl_of_fake_packet = nhops - autottl1 - trunc((autottl2 - autottl1) * ((float)nhops/10));
+	}
+
+	if (maxttl && ttl_of_fake_packet > maxttl) {
+		ttl_of_fake_packet = maxttl;
+	}
+
+	return ttl_of_fake_packet;
 }
