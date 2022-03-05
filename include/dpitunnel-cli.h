@@ -35,9 +35,16 @@ static const std::map<Desync_first_attacks, std::string> FIRST_ATTACKS_NAMES = {
 struct Profile_s {
 	unsigned int buffer_size = 512;
 	unsigned int split_position = 3;
-	unsigned short fake_packets_ttl = 1;
+	unsigned short fake_packets_ttl = 0;
 	unsigned short window_size = 0;
 	short window_scale_factor = -1;
+
+	bool wrong_seq = false;
+	// This is the smallest ACK drift Linux can't handle already, since at least v2.6.18.
+	// https://github.com/torvalds/linux/blob/v2.6.18/net/netfilter/nf_conntrack_proto_tcp.c#L395
+	int wrong_seq_drift_ack = -66000;
+	// This is just random, no specifics about this value.
+	int wrong_seq_drift_seq = -10000;
 
 	unsigned short min_ttl = 0;
 	bool auto_ttl = false;

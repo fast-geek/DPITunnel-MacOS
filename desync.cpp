@@ -378,7 +378,7 @@ int do_desync_attack(int socket_srv, const std::string & ip_srv, int port_srv, i
 	} else
 		split_pos = std::min(Profile.split_position, last_char);
 
-	uint8_t fake_ttl = Profile.fake_packets_ttl;
+	uint8_t fake_ttl = Profile.fake_packets_ttl != 0 ? Profile.fake_packets_ttl : default_ttl;
 	std::string packet_fake;
 	uint8_t flags;
 	std::string packet_mod;
@@ -438,11 +438,13 @@ int do_desync_attack(int socket_srv, const std::string & ip_srv, int port_srv, i
 			// If it's https connection send TLS ClientHello
 			if(is_https)
 				packet_fake = form_packet(packet_raw, FAKE_TLS_PACKET.c_str(), FAKE_TLS_PACKET.size(),
-								rand() % 65535, fake_ttl, 0, 1, window_size, true);
+								rand() % 65535, fake_ttl, Profile.wrong_seq ? Profile.wrong_seq_drift_seq : 0,
+										  Profile.wrong_seq ? Profile.wrong_seq_drift_ack : 1, window_size, true);
 			// If http send GET request
 			else
 				packet_fake = form_packet(packet_raw, FAKE_HTTP_PACKET.c_str(), FAKE_HTTP_PACKET.size(),
-								rand() % 65535, fake_ttl, 0, 1, window_size, true);
+								rand() % 65535, fake_ttl, Profile.wrong_seq ? Profile.wrong_seq_drift_seq : 0,
+										  Profile.wrong_seq ? Profile.wrong_seq_drift_ack : 1, window_size, true);
 
 			if(send_string_raw(sockfd, packet_fake, packet_fake.size(),
 				(struct sockaddr*) &serv_addr, sizeof(serv_addr)) == -1) {
@@ -458,7 +460,8 @@ int do_desync_attack(int socket_srv, const std::string & ip_srv, int port_srv, i
 			if(Profile.desync_zero_attack == DESYNC_ZERO_RSTACK)
 				flags |= TH_ACK;
 			packet_fake = form_packet(packet_raw, NULL, 0, rand() % 65535,
-									  fake_ttl, 0, 1, window_size, true, &flags);
+									  fake_ttl, Profile.wrong_seq ? Profile.wrong_seq_drift_seq : 0,
+									  Profile.wrong_seq ? Profile.wrong_seq_drift_ack : 1, window_size, true, &flags);
 
 			if(send_string_raw(sockfd, packet_fake, packet_fake.size(),
 				(struct sockaddr*) &serv_addr, sizeof(serv_addr)) == -1) {
@@ -530,7 +533,8 @@ int do_desync_attack(int socket_srv, const std::string & ip_srv, int port_srv, i
 			// Send first fake packet
 			if(Profile.desync_first_attack == DESYNC_FIRST_DISORDER_FAKE) {
 				packet_fake = form_packet(packet_raw, data_empty.c_str(), split_pos,
-								ip_id_first, fake_ttl, 0, 1, window_size, true);
+								ip_id_first, fake_ttl, Profile.wrong_seq ? Profile.wrong_seq_drift_seq : 0,
+										  Profile.wrong_seq ? Profile.wrong_seq_drift_ack : 1, window_size, true);
 				if(send_string_raw(sockfd, packet_fake, packet_fake.size(),
 					(struct sockaddr*) &serv_addr, sizeof(serv_addr)) == -1) {
 					close(sockfd);
@@ -600,7 +604,8 @@ int do_desync_attack(int socket_srv, const std::string & ip_srv, int port_srv, i
 			// Send first fake packet
 			if(Profile.desync_first_attack == DESYNC_FIRST_SPLIT_FAKE) {
 				packet_fake = form_packet(packet_raw, data_empty.c_str(), split_pos,
-								ip_id_first, fake_ttl, 0, 1, window_size, true);
+								ip_id_first, fake_ttl, Profile.wrong_seq ? Profile.wrong_seq_drift_seq : 0,
+										  Profile.wrong_seq ? Profile.wrong_seq_drift_ack : 1, window_size, true);
 				if(send_string_raw(sockfd, packet_fake, packet_fake.size(),
 					(struct sockaddr*) &serv_addr, sizeof(serv_addr)) == -1) {
 					close(sockfd);

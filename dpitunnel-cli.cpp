@@ -54,6 +54,7 @@ const std::string HELP_PAGE(
 			"  --desync-attacks=[<mode0>][,<mode1>]\t\tmode0: fake rst rstack. mode1: disorder disorder_fake split split_fake\n"
 			"  --split-at-sni\t\t\t\tsplit Client Hello at SNI\n"
 			"  --split-position=<offset_in_bytes>\t\tsplit Client Hello at <offset_in_bytes>. Default: 3\n"
+			"  --wrong-seq\t\t\t\t\tsend fakes with TCP SEQ/ACK from past"
 			"  --ttl=<number>\t\t\t\tTTL for fake packets\n"
 			"  --auto-ttl=<a1>-<a2>-<m>\t\t\tautomatically detect TTL and decrease\n"
             "  \t\t\t\t\t\tit based on a distance. If the distance is shorter than a2, TTL is decreased\n"
@@ -402,6 +403,7 @@ int parse_cmdline(int argc, char* argv[]) {
 		{"pid", required_argument, 0, 0}, // id 19
 		{"min-ttl", required_argument, 0, 0}, // id 20
 		{"auto-ttl", required_argument, 0, 0}, // id 21
+		{"wrong-seq", no_argument, 0, 0}, // id 22
 		{NULL, 0, NULL, 0}
 	};
 
@@ -606,6 +608,11 @@ int parse_cmdline(int argc, char* argv[]) {
 					if (profile.min_ttl == 0)
 						profile.min_ttl = 3;
 				}
+
+				break;
+
+			case 22: // wrong-seq
+				profile.wrong_seq = true;
 
 				break;
 		}
