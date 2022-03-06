@@ -12,6 +12,32 @@
 #include <math.h>
 #include <unistd.h>
 
+bool wildcard_match(char const *needle, char const *haystack) {
+	for (; *needle != '\0'; ++needle) {
+		switch (*needle) {
+			case '?':
+				if (*haystack == '\0')
+					return false;
+				++haystack;
+				break;
+			case '*': {
+				if (needle[1] == '\0')
+					return true;
+				size_t max = strlen(haystack);
+				for (size_t i = 0; i < max; i++)
+					if (wildcard_match(needle + 1, haystack + i))
+						return true;
+				return false;
+			}
+			default:
+				if (*haystack != *needle)
+					return false;
+				++haystack;
+		}
+	}
+	return *haystack == '\0';
+}
+
 bool is_space_or_tab(char c) { return c == ' ' || c == '\t'; }
 
 std::pair<size_t, size_t> trim(const char *b, const char *e, size_t left,

@@ -1,6 +1,7 @@
 #include "dpitunnel-cli.h"
 
 #include "profiles.h"
+#include "utils.h"
 
 #include <iostream>
 
@@ -16,7 +17,9 @@ int change_profile(const std::string & iface, const std::string & wifi_ap, std::
 	if(Profiles.empty())
 		return 0;
 
-	auto search = Profiles.find(iface + (wifi_ap.empty() ? "" : (':' + wifi_ap)));
+	auto search = find_if(Profiles.begin(), Profiles.end(), [iface, wifi_ap](const auto& element) -> bool {
+		return wildcard_match(element.first.c_str(), (iface + (wifi_ap.empty() ? "" : (':' + wifi_ap))).c_str());
+	});
 	if(search != Profiles.end())
 		Profile = search->second;
 	else {
