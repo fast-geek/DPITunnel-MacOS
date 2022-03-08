@@ -19,6 +19,11 @@ enum Desync_first_attacks {
 	DESYNC_FIRST_NONE
 };
 
+enum Proxy_mode {
+	MODE_PROXY,
+	MODE_TRANSPARENT
+};
+
 static const std::map<Desync_zero_attacks, std::string> ZERO_ATTACKS_NAMES = {
 	{DESYNC_ZERO_FAKE, "fake"},
 	{DESYNC_ZERO_RST, "rst"},
@@ -30,6 +35,11 @@ static const std::map<Desync_first_attacks, std::string> FIRST_ATTACKS_NAMES = {
 	{DESYNC_FIRST_DISORDER_FAKE, "disorder_fake"},
 	{DESYNC_FIRST_SPLIT, "split"},
 	{DESYNC_FIRST_SPLIT_FAKE, "split_fake"}
+};
+
+static const std::map<Proxy_mode, std::string> PROXY_MODE_NAMES = {
+		{MODE_PROXY, "proxy"},
+		{MODE_TRANSPARENT, "transparent"}
 };
 
 struct Profile_s {
@@ -74,6 +84,8 @@ struct Settings_perst_s {
 
 	int server_port = 8080;
 	std::string server_address = "0.0.0.0";
+
+	Proxy_mode proxy_mode = MODE_PROXY;
 
 	std::string ca_bundle_path = "./ca.bundle";
 	std::string ca_bundle;

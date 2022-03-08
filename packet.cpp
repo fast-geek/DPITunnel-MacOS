@@ -2,24 +2,82 @@
 #include "utils.h"
 
 #include <regex>
+#include <map>
 
-int parse_request(const std::string & request, std::string & method, std::string & host, int & port) {
-	// Extract method
-	size_t method_end_position = request.find(' ');
-	if(method_end_position == std::string::npos)
+void parse_header(const std::string& line, std::map<std::string, std::string> & http_message) {
+	if(line.empty()) return;
+
+	size_t posFirst = line.find(':',0); //Look for separator ':'
+
+	std::string key = line.substr(0, posFirst);
+	transform(key.begin(), key.end(), key.begin(),
+			  [](unsigned char c){ return std::tolower(c); });
+	std::string value = line.substr(line.at(posFirst + 1) == ' ' ? posFirst + 2 : posFirst + 1); // Skip ' ' after header
+
+	http_message[key] = value;
+}
+
+void parse_first_line(const std::string& line, std::map<std::string, std::string> & http_message) {
+	size_t position, lpost;
+
+	// Find request method
+	position = line.find(' ');
+	http_message["method"] = line.substr(0, position);
+	lpost = ++position; //Skip character ' '
+
+	// Find path
+	position = line.find(' ', lpost);
+	http_message["path"] = line.substr(lpost, (position-lpost));
+	position++; //Skip character ' '
+
+	// Find HTTP version
+	http_message["version"] = line.substr(position);
+}
+
+std::map<std::string, std::string> parse_http_message(std::string message) {
+	std::map<std::string, std::string> http_message;
+	std::regex rgx("(\\r\\n|\\r|\\n)");
+	std::sregex_token_iterator iter(message.begin(),
+									message.end(),
+									rgx,
+									-1);
+	std::sregex_token_iterator end;
+	for ( bool is_first = true; iter != end; ++iter) {
+		if(is_first) {
+			parse_first_line(*iter, http_message);
+			is_first = false;
+			continue;
+		}
+		parse_header(*iter, http_message);
+	}
+	return http_message;
+}
+
+
+int parse_request(const std::string & request, std::string & method, std::string & host, int & port, bool is_proxy) {
+	std::map<std::string, std::string> http_request = parse_http_message(request);
+
+	if(http_request.find("method") == http_request.end())
 		return -1;
-	method = request.substr(0, method_end_position);
+	method = http_request["method"];
 
-	// Extract hostname an port if exists
-	std::string regex_string = "[-a-zA-Z0-9@:%._\\+~#=]{2,256}\\.[-a-z0-9]{1,16}(:[0-9]{1,5})?";
-	std::regex url_find_regex(regex_string);
-	std::smatch match;
+	std::string found_url;
+	if(is_proxy) {
+		// Extract hostname an port if exists
+		std::string regex_string = "[-a-zA-Z0-9@:%._\\+~#=]{2,256}\\.[-a-z0-9]{1,16}(:[0-9]{1,5})?";
+		std::regex url_find_regex(regex_string);
+		std::smatch match;
 
-	if(std::regex_search(request, match, url_find_regex) == 0)
-		return -1;
+		if(std::regex_search(http_request["path"], match, url_find_regex) == 0)
+			return -1;
 
-	// Get string from regex output
-	std::string found_url = match.str(0);
+		// Get string from regex output
+		found_url = match.str(0);
+	} else {
+		if(http_request.find("host") == http_request.end())
+			return -2; // seems it is https in transparent mode
+		found_url = http_request["host"];
+	}
 
 	// Remove "www." if exists
 	size_t www = found_url.find("www.");
@@ -45,7 +103,7 @@ int parse_request(const std::string & request, std::string & method, std::string
 void remove_proxy_strings(std::string & request, unsigned int & last_char) {
 	std::string method, host;
 	int port;
-	if(parse_request(request, method, host, port) || !validate_http_method(method))
+	if(parse_request(request, method, host, port, true) || !validate_http_method(method))
 		return;
 
 	unsigned int request_size = request.size();

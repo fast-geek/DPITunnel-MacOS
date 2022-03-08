@@ -37,7 +37,7 @@ const std::string HELP_PAGE(
 			"\n"
 			"Usage:\n"
 			"  dpitunnel-cli [options]\n"
-			"  dpitunnel-cli [--pid <file>][--ip <bind_ip>][--port <bind_port>][--ca-bundle-path <path>][--daemon] <--profile [<net_interface_name>[:<wifi_name>]]|[default] [options]>...\n"
+			"  dpitunnel-cli [--pid <file>][--ip <bind_ip>][--port <bind_port>][--mode <mode>][--ca-bundle-path <path>][--daemon] <--profile [<net_interface_name>[:<wifi_name>]]|[default] [options]>...\n"
 			"  dpitunnel-cli --auto\n"
 			"\n"
 			"Options:\n"
@@ -48,6 +48,7 @@ const std::string HELP_PAGE(
 			"  --pid=<file>\t\t\t\t\twrite pid to file in daemon mode\n"
 			"  --ip=<ip>\t\t\t\t\tIP to bind the http proxy. Default: 0.0.0.0\n"
 			"  --port=<port>\t\t\t\t\tport to bind http proxy. Default: 8080\n"
+			"  --mode=<mode>\t\t\t\t\tproxy mode. mode: proxy, transparent. Default: proxy\n"
 			"  --ca-bundle-path=<path>\t\t\tpath to CA certificates bundle in PEM format. Default: ./ca.bundle\n"
 			"  --daemon\t\t\t\t\tdaemonize program\n"
 			"  --buffer-size=<size_in_bytes>\t\t\tsize of buffers. Default: 512\n"
@@ -110,15 +111,49 @@ void process_client_cycle(int client_socket) {
 	std::string server_ip;
 	int server_port;
 	std::string server_method;
-	if(parse_request(buffer, server_method, server_host, server_port) == -1) {
+	int res;
+	if((res = parse_request(buffer, server_method, server_host, server_port,
+							Settings_perst.proxy_mode == MODE_PROXY)) == -1) {
 		std::cerr << "Can't parse first request" << std::endl;
 		send_string(client_socket, CONNECTION_ERROR_RESPONSE, CONNECTION_ERROR_RESPONSE.size());
 		close(client_socket);
 		return;
 	}
-	is_https = server_method == "CONNECT";
+
+#ifndef SO_ORIGINAL_DST
+#define SO_ORIGINAL_DST 80
+#endif
+	if(Settings_perst.proxy_mode == MODE_TRANSPARENT) {
+		is_https = res == -2;
+		// Get original destination address
+		struct sockaddr_in server_address;
+		socklen_t server_address_len = sizeof server_address;
+		if (getsockopt(client_socket, SOL_IP, SO_ORIGINAL_DST, (struct sockaddr *) &server_address, &server_address_len) != 0) {
+			std::cerr << "Can't get original address. Errno: " << std::strerror(errno) << std::endl;
+			close(client_socket);
+			return;
+		}
+		if (is_https) {
+			// Get server domain from SNI
+			unsigned int sni_start, sni_len;
+			get_tls_sni(buffer, last_char, sni_start, sni_len);
+			if(sni_start + sni_len > last_char || sni_start == 0 || sni_len == 0) { // failed to find sni
+				// Use original IP as server domain
+				char str[INET_ADDRSTRLEN];
+				inet_ntop(AF_INET, &(server_address.sin_addr), str, INET_ADDRSTRLEN);
+				server_host = std::string(str);
+			} else {
+				server_host = buffer.substr(sni_start, sni_len);
+			}
+		}
+		// Use original TCP port as server port
+		server_port = ntohs(server_address.sin_port);
+	}
+	else
+		is_https = server_method == "CONNECT";
+
 	// Remove proxy connection specific parts
-	if(!is_https)
+	if(!is_https && Settings_perst.proxy_mode == MODE_PROXY)
 		remove_proxy_strings(buffer, last_char);
 
 	// Resolve server ip
@@ -186,7 +221,7 @@ void process_client_cycle(int client_socket) {
 	}
 	local_port.store(ntohs(local_addr.sin_port));
 
-	if(is_https)
+	if(is_https && Settings_perst.proxy_mode == MODE_PROXY)
 		if(send_string(client_socket, CONNECTION_ESTABLISHED_RESPONSE, CONNECTION_ESTABLISHED_RESPONSE.size()) == -1) {
 			close(server_socket);
 			close(client_socket);
@@ -204,7 +239,7 @@ void process_client_cycle(int client_socket) {
 			return;
 		}
 		// Get first client packet
-		if(is_https) {
+		if(is_https && Settings_perst.proxy_mode == MODE_PROXY) {
 				if(recv_string(client_socket, buffer, last_char, &timeout_recv) == -1) {
 					close(server_socket);
 					close(client_socket);
@@ -214,7 +249,7 @@ void process_client_cycle(int client_socket) {
 		do_desync_attack(server_socket, server_ip, server_port, local_port,
 					is_https, sniffed_packet, buffer, last_char);
 	// Send packet we received previously if it's http connection
-	} else if(!is_https) {
+	} else if(!is_https || Settings_perst.proxy_mode == MODE_TRANSPARENT) {
 		if(send_string(server_socket, buffer, last_char) == -1) {
 			send_string(client_socket, CONNECTION_ERROR_RESPONSE, CONNECTION_ERROR_RESPONSE.size());
 			close(server_socket);
@@ -270,7 +305,7 @@ void process_client_cycle(int client_socket) {
 				if(recv_string(client_socket, buffer, last_char) == -1)
                 			is_transfer_failure = true;
 
-				if(!is_https)
+				if(!is_https && Settings_perst.proxy_mode == MODE_PROXY)
 					remove_proxy_strings(buffer, last_char);
 
 				if(send_string(server_socket, buffer, last_char) == -1)
@@ -404,6 +439,7 @@ int parse_cmdline(int argc, char* argv[]) {
 		{"min-ttl", required_argument, 0, 0}, // id 20
 		{"auto-ttl", required_argument, 0, 0}, // id 21
 		{"wrong-seq", no_argument, 0, 0}, // id 22
+		{"mode", required_argument, 0, 0}, // id 23
 		{NULL, 0, NULL, 0}
 	};
 
@@ -613,6 +649,18 @@ int parse_cmdline(int argc, char* argv[]) {
 
 			case 22: // wrong-seq
 				profile.wrong_seq = true;
+
+				break;
+
+			case 23: // mode
+				if(!strcmp(optarg, PROXY_MODE_NAMES.at(MODE_PROXY).c_str()))
+					Settings_perst.proxy_mode = MODE_PROXY;
+				else if(!strcmp(optarg, PROXY_MODE_NAMES.at(MODE_TRANSPARENT).c_str()))
+					Settings_perst.proxy_mode = MODE_TRANSPARENT;
+				else {
+					std::cerr << "-mode invalid argument" << std::endl;
+					return -1;
+				}
 
 				break;
 		}
