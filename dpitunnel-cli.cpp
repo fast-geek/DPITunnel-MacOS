@@ -714,16 +714,15 @@ int main(int argc, char* argv[]) {
 	// If we have profiles, choose profile
 	if(!Profiles.empty()) {
 		std::string iface = get_current_iface_name();
-		if(iface.empty()) {
-			std::cerr << "Failed to find default route" << std::endl;
-			return -1;
-		}
 		std::string wifi_ap = get_current_wifi_name(iface);
 
-        std::cout << "Netiface: " << iface;
-        if(!wifi_ap.empty())
-            std::cout << ", Wi-Fi point name: " << wifi_ap;
-        std::cout << std::endl;
+        if(!iface.empty()) {
+            std::cout << "Netiface: " << iface;
+            if(!wifi_ap.empty())
+                std::cout << ", Wi-Fi point name: " << wifi_ap;
+            std::cout << std::endl;
+        } else
+            std::cout << "Try to set default profile" << std::endl;
 
 		if(change_profile(iface, wifi_ap) == -1)
 			return -1; //exit_failure();
