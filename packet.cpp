@@ -64,7 +64,7 @@ int parse_request(const std::string & request, std::string & method, std::string
 	std::string found_url;
 	if(is_proxy) {
 		// Extract hostname an port if exists
-		std::string regex_string = "[-a-zA-Z0-9@:%._\\+~#=]{2,256}\\.[-a-z0-9]{1,16}(:[0-9]{1,5})?";
+		std::string regex_string = "[-a-zA-Z0-9@:%._\\+~#=]{1,256}\\.[-a-z0-9]{1,16}(:[0-9]{1,5})?";
 		std::regex url_find_regex(regex_string);
 		std::smatch match;
 
