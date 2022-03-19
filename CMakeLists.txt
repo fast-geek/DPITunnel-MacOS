@@ -16,7 +16,6 @@ project(DPITunnel-cli)
 add_subdirectory(RawSocket)
 add_subdirectory(cpp-httplib)
 add_subdirectory(dnslib)
-add_subdirectory(libnl)
 
 # Add an executable
 add_executable(DPITunnel-cli-exec
@@ -24,7 +23,6 @@ add_executable(DPITunnel-cli-exec
 		desync.cpp
 		dns.cpp
 		dpitunnel-cli.cpp
-		netiface.cpp
 		packet.cpp
 		profiles.cpp
 		socket.cpp
@@ -46,7 +44,6 @@ target_include_directories(DPITunnel-cli-exec
 		${PROJECT_SOURCE_DIR}/RawSocket/include
 		${PROJECT_SOURCE_DIR}/cpp-httplib/include
 		${PROJECT_SOURCE_DIR}/dnslib/include
-		${PROJECT_SOURCE_DIR}/libnl/include
 )
 
 set(THREADS_PREFER_PTHREAD_FLAG ON)
@@ -61,7 +58,6 @@ target_link_libraries(DPITunnel-cli-exec
 		RawSocket
 		cpp-httplib
 		dnslib
-		libnl
 		Threads::Threads
 		OpenSSL::SSL
 		OpenSSL::Crypto

@@ -1,5 +1,6 @@
 #ifndef CHECKSUM_H
 #define CHECKSUM_H
+#define iphdr ip
 
 #ifdef __cplusplus
 extern "C" {

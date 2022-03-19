@@ -21,13 +21,15 @@
 #include <thread>
 #include <signal.h>
 #include <unordered_map>
-#include <sys/prctl.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <getopt.h>
 #include <poll.h>
 #include <unistd.h>
+
+#define PR_SET_NAME    15
+#define SOL_IP 0
 
 const std::string CONNECTION_ESTABLISHED_RESPONSE("HTTP/1.1 200 Connection established\r\n\r\n");
 const std::string CONNECTION_ERROR_RESPONSE("HTTP/1.1 0 Connection establish problem (read logs)\r\n\r\n");
@@ -400,7 +402,7 @@ void accept_client_cycle(int server_socket) {
 					Threads.emplace(t1.get_id(), std::move(t1));
 				}
 				thread_starter.set_value();
-				
+
 			}
 
 			fds[0].revents = 0;
@@ -689,12 +691,12 @@ void sig_int_handler(int signum) {
 	stop_flag.store(true);
 	// Interrupt poll()
 	close(Interrupt_pipe[0]);
-	close(Interrupt_pipe[1]);	
+	close(Interrupt_pipe[1]);
 }
 
 int main(int argc, char* argv[]) {
 	// Set process name
-        prctl(PR_SET_NAME, PROCESS_NAME.c_str(), NULL, NULL, NULL);
+//        prctl(PR_SET_NAME, PROCESS_NAME.c_str(), NULL, NULL, NULL);
         std::strcpy(argv[0], PROCESS_NAME.c_str());
 
 	// Init
@@ -712,21 +714,21 @@ int main(int argc, char* argv[]) {
 	pipe(Interrupt_pipe);
 
 	// If we have profiles, choose profile
-	if(!Profiles.empty()) {
-		std::string iface = get_current_iface_name();
-		std::string wifi_ap = get_current_wifi_name(iface);
-
-        if(!iface.empty()) {
-            std::cout << "Netiface: " << iface;
-            if(!wifi_ap.empty())
-                std::cout << ", Wi-Fi point name: " << wifi_ap;
-            std::cout << std::endl;
-        } else
-            std::cout << "Try to set default profile" << std::endl;
-
-		if(change_profile(iface, wifi_ap) == -1)
-			return -1; //exit_failure();
-	}
+//	if(!Profiles.empty()) {
+//		std::string iface = get_current_iface_name();
+//		std::string wifi_ap = get_current_wifi_name(iface);
+//
+//        if(!iface.empty()) {
+//            std::cout << "Netiface: " << iface;
+//            if(!wifi_ap.empty())
+//                std::cout << ", Wi-Fi point name: " << wifi_ap;
+//            std::cout << std::endl;
+//        } else
+//            std::cout << "Try to set default profile" << std::endl;
+//
+//		if(change_profile(iface, wifi_ap) == -1)
+//			return -1; //exit_failure();
+//	}
 
 	if(Profile.doh)
 		if(load_ca_bundle() == -1)
@@ -785,8 +787,8 @@ int main(int argc, char* argv[]) {
 
 	// Start route monitor thread to correctly change profiles
 	std::thread t1;
-	if(!Profiles.empty())
-		t1 = std::thread(route_monitor_thread);
+//	if(!Profiles.empty())
+//		t1 = std::thread(route_monitor_thread);
 
 	// Register ctrl-c and terminate handlers
 	struct sigaction signalAction;

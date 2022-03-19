@@ -1,12 +1,12 @@
 #include <RawSocket/CheckSum.h>
-#include <stdio.h>
+#include <cstdio>
 
 struct PseudoHead{
   uint8_t zero;
   uint8_t type;
   uint16_t  len;
-  uint32_t src_ip;
-  uint32_t dst_ip;
+  in_addr src_ip;
+  in_addr dst_ip;
 };
 
 static uint32_t CalSum(const uint8_t* buf, int len) {
@@ -26,25 +26,25 @@ static uint32_t CalPseudoHeadSum(const iphdr* pIpHead, uint8_t type) {
   PseudoHead head;
   head.zero = 0;
   head.type = type;
-  head.len = htons(static_cast<uint16_t>(ntohs(pIpHead->tot_len) - pIpHead->ihl * 4));
-  head.src_ip = pIpHead->saddr;
-  head.dst_ip = pIpHead->daddr;
+  head.len = htons(static_cast<uint16_t>(ntohs(pIpHead->ip_len) - pIpHead->ip_hl * 4));
+  head.src_ip = pIpHead->ip_src;
+  head.dst_ip = pIpHead->ip_dst;
   return CalSum((uint8_t*)&head, sizeof(PseudoHead));
 }
 
 uint16_t cksumIp(iphdr* pIpHead){
-  pIpHead->check = 0;
-  uint32_t ckSum = CalSum((uint8_t*)pIpHead, pIpHead->ihl * 4);
+  pIpHead = 0;
+  uint32_t ckSum = CalSum((uint8_t*)pIpHead, pIpHead->ip_hl * 4);
   ckSum = (ckSum >> 16) + (ckSum & 0xffff);
   ckSum += ckSum >> 16;
   return htons((uint16_t)~ckSum);
 }
 
 uint16_t cksumTcp(iphdr* pIpHead, tcphdr* pTcpHead){
-  pTcpHead->check = 0;
+  pTcpHead = 0;
   uint32_t ckSum = CalPseudoHeadSum(pIpHead, 0x06);
   ckSum += CalSum((uint8_t*)pTcpHead,
-      ntohs(pIpHead->tot_len) - pIpHead->ihl * 4);
+      ntohs(pIpHead->ip_len) - pIpHead->ip_hl * 4);
   ckSum = (ckSum >> 16) + (ckSum & 0xffff);
   ckSum += ckSum >> 16;
   return htons((uint16_t)~ckSum);

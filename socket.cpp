@@ -21,6 +21,9 @@
 #include <thread>
 #include <unistd.h>
 
+#define iphdr ip
+#define SO_RCVBUFFORCE (30)
+
 extern struct Settings_perst_s Settings_perst;
 extern struct Profile_s Profile;
 
@@ -210,18 +213,18 @@ short count_hops_private(struct sockaddr_in server_address, std::string ip, int 
 					}
 
 					// Get IP header of received packet
-					iphdr* ip_h = (iphdr*) &buffer[0];
+//					iphdr* ip_h = (iphdr*) &buffer[0];
 					// Get TCP header of received packet
-					tcphdr* tcp_h = (tcphdr*) (&buffer[0] + ip_h->ihl * 4);
+//					tcphdr* tcp_h = (tcphdr*) (&buffer[0] + ip_h->ihl * 4);
 					// Get source port (server port)
-					int port_src_recv = ntohs(tcp_h->source);
+//					int port_src_recv = ntohs(tcp_h->source);
 					// Get dest port (client port)
-					int port_dst_recv = ntohs(tcp_h->dest);
-					if(ip_h->saddr == server_address.sin_addr.s_addr &&
-						port_src_recv == port && port_dst_recv == local_port) {
-						is_received_reply = true;
-						break;
-					}
+//					int port_dst_recv = ntohs(tcp_h->dest);
+//					if(ip_h->saddr == server_address.sin_addr.s_addr &&
+//						port_src_recv == port && port_dst_recv == local_port) {
+//						is_received_reply = true;
+//						break;
+//					}
 
 				}
 

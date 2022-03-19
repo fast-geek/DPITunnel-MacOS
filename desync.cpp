@@ -116,17 +116,17 @@ int sniff_ack_packet(std::string * packet, std::string ip_srv, int port_srv,
                                 // Get IP header of received packet
                                 iphdr* ip_h = (iphdr*) &buffer[0];
                                 // Get TCP header of received packet
-                                tcphdr* tcp_h = (tcphdr*) (&buffer[0] + ip_h->ihl * 4);
+                                tcphdr* tcp_h = (tcphdr*) (&buffer[0] + ip_h->ip_hl * 4);
                                 // Get source port (server port)
-                                int port_src_recv = ntohs(tcp_h->source);
+//                                int port_src_recv = ntohs(tcp_h->source);
                                 // Get dest port (client port)
-                                int port_dst_recv = ntohs(tcp_h->dest);
+//                                int port_dst_recv = ntohs(tcp_h->dest);
 				// Compare received IP/port and IP/port we waiting for
-				if(ip_h->saddr == ip_srv_sockaddr.sin_addr.s_addr &&
-					port_srv == port_src_recv && port_local == port_dst_recv) {
-					*packet = buffer;
-					(*flag).store(false);
-				}
+//				if(ip_h->saddr == ip_srv_sockaddr.sin_addr.s_addr &&
+//					port_srv == port_src_recv && port_local == port_dst_recv) {
+//					*packet = buffer;
+//					(*flag).store(false);
+//				}
 			}
 
 			fds[0].revents = 0;
@@ -214,22 +214,22 @@ int sniff_handshake_packet(std::string * packet, std::string ip_srv,
 				// Get IP header of received packet
 				iphdr* ip_h = (iphdr*) &buffer[0];
 				// Get TCP header of received packet
-				tcphdr* tcp_h = (tcphdr*) (&buffer[0] + ip_h->ihl * 4);
+				tcphdr* tcp_h = (tcphdr*) (&buffer[0] + ip_h->ip_hl * 4);
 				// Get source port (server port)
-				int port_src_recv = ntohs(tcp_h->source);
+//				int port_src_recv = ntohs(tcp_h->source);
 				// Get dest port (client port)
-				int port_dst_recv = ntohs(tcp_h->dest);
+//				int port_dst_recv = ntohs(tcp_h->dest);
 				// Compare received IP/port and IP/port we waiting for
-				if(ip_h->saddr == ip_srv_sockaddr.sin_addr.s_addr &&
-					port_srv == port_src_recv) {
-					if(!is_searched)
-						packets[port_dst_recv] = buffer;
-					else if(local_port == port_dst_recv) {
-						// Found correct packet
-						*packet = buffer;
-						break;
-					}
-				}
+//				if(ip_h->saddr == ip_srv_sockaddr.sin_addr.s_addr &&
+//					port_srv == port_src_recv) {
+//					if(!is_searched)
+//						packets[port_dst_recv] = buffer;
+//					else if(local_port == port_dst_recv) {
+//						 Found correct packet
+//						*packet = buffer;
+//						break;
+//					}
+//				}
 			}
 
 			fds[0].revents = 0;
@@ -253,40 +253,40 @@ std::string form_packet(std::string packet_raw, const char * packet_data, unsign
 	// Get IP header
 	iphdr* ip_h = (iphdr*) &packet_raw[0];
 	// Get TCP header
-	tcphdr* tcp_h = (tcphdr*) (&packet_raw[0] + ip_h->ihl * 4);
+	tcphdr* tcp_h = (tcphdr*) (&packet_raw[0] + ip_h->ip_hl * 4);
 	// Fill proper data in IP header
-	ip_h->tos = 0;
-	ip_h->tot_len = htons(sizeof (struct iphdr) + sizeof (struct tcphdr) + packet_data_size);
-	ip_h->id = htons(id);
-	ip_h->frag_off = htons(0x4000); // Don't fragment
-	ip_h->ttl = ttl;
-	ip_h->check = 0;
+	ip_h->ip_tos = 0;
+	ip_h->ip_len = htons(sizeof (struct iphdr) + sizeof (struct tcphdr) + packet_data_size);
+	ip_h->ip_id = htons(id);
+	ip_h->ip_off = htons(0x4000); // Don't fragment
+	ip_h->ip_ttl = ttl;
+//	ip_h->check = 0;
 	if(is_swap_addr)
-		std::swap(ip_h->saddr, ip_h->daddr);
+		std::swap(ip_h->ip_src, ip_h->ip_dst);
 	// Check sum IP
-	ip_h->check = cksumIp(ip_h);
+//	ip_h->check = cksumIp(ip_h);
 	// Fill proper data in TCP header
 	if(is_swap_addr) {
-		std::swap(tcp_h->source, tcp_h->dest);
-		std::swap(tcp_h->seq, tcp_h->ack_seq);
+//		std::swap(tcp_h->source, tcp_h->dest);
+		std::swap(tcp_h->th_seq, tcp_h->th_ack);
 	}
-	tcp_h->ack_seq = htonl(ntohl(tcp_h->ack_seq) + ack_seq);
-	tcp_h->seq = htonl(ntohl(tcp_h->seq) + seq);
-	tcp_h->window = htons(window_size);
-	tcp_h->doff = 5;
+	tcp_h->th_ack = htonl(ntohl(tcp_h->th_ack) + ack_seq);
+	tcp_h->th_seq = htonl(ntohl(tcp_h->th_seq) + seq);
+	tcp_h->th_win = htons(window_size);
+	tcp_h->th_off = 5;
 	if(flags == NULL) {
-		tcp_h->fin = 0;
-		tcp_h->syn = 0;
-		tcp_h->rst = 0;
-		tcp_h->psh = 1;
-		tcp_h->ack = 1;
+//		tcp_h->ip = 0;
+//		tcp_h->syn = 0;
+//		tcp_h->rst = 0;
+//		tcp_h->psh = 1;
+//		tcp_h->ack = 1;
 	} else
 		*((uint8_t*) tcp_h + 13) = *flags;
-	tcp_h->urg = 0;
-	tcp_h->check = 0;
-	tcp_h->urg_ptr = 0;
+//	tcp_h->urg = 0;
+//	tcp_h->check = 0;
+//	tcp_h->urg_ptr = 0;
 	// Check sum TCP
-	tcp_h->check = cksumTcp(ip_h, tcp_h);
+//	tcp_h->check = cksumTcp(ip_h, tcp_h);
 	ip_h = NULL;
 	tcp_h = NULL;
 
@@ -385,9 +385,9 @@ int do_desync_attack(int socket_srv, const std::string & ip_srv, int port_srv, i
 	std::string data_empty(last_char, '\x00');
 	unsigned short ip_id_first = rand() % 65535;
 	if(Profile.auto_ttl) {
-		fake_ttl = tcp_get_auto_ttl(srv_pack_ip_h->ttl, Profile.auto_ttl_a1, Profile.auto_ttl_a2, Profile.min_ttl, Profile.auto_ttl_max);
+		fake_ttl = tcp_get_auto_ttl(srv_pack_ip_h->ip_ttl, Profile.auto_ttl_a1, Profile.auto_ttl_a2, Profile.min_ttl, Profile.auto_ttl_max);
 	} else if(Profile.min_ttl) {
-		if(tcp_get_auto_ttl(srv_pack_ip_h->ttl, 0, 0, Profile.min_ttl, 0)) {
+		if(tcp_get_auto_ttl(srv_pack_ip_h->ip_ttl, 0, 0, Profile.min_ttl, 0)) {
 			// DON'T send fakes
 			// Set low TTL to make socket_srv not to send packet but to increase sequence number
 			if(set_ttl(socket_srv, 1) == 1) {
